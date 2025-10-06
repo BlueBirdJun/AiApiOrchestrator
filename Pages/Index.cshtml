@@ -1,0 +1,272 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "AI API Orchestrator";
+}
+
+<div class="container">
+    <div class="header">
+        <h1>AI API Orchestrator</h1>
+        <p>자연어 프롬프트를 입력하면 AI가 적절한 API를 호출합니다</p>
+    </div>
+
+    <div class="input-section">
+        <div class="form-group">
+            <label for="promptInput">프롬프트 입력</label>
+            <textarea id="promptInput" class="form-control" rows="4" placeholder="예: 서울 날씨 알려줘, 애플 주식 정보, 기술 뉴스"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="aiModeSelect">AI 모드 선택</label>
+            <select id="aiModeSelect" class="form-control">
+                <option value="0">Ollama</option>
+                <option value="1">Agent</option>
+            </select>
+        </div>
+
+        <button id="submitBtn" class="btn btn-primary">전송</button>
+    </div>
+
+    <div id="loadingIndicator" class="loading-indicator" style="display: none;">
+        <div class="spinner"></div>
+        <span>처리 중...</span>
+    </div>
+
+    <div id="resultSection" class="result-section" style="display: none;">
+        <h3>결과</h3>
+        <div id="resultContent" class="result-content"></div>
+    </div>
+</div>
+
+<style>
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .header h1 {
+        color: #333;
+        margin-bottom: 10px;
+    }
+
+    .header p {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .input-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 15px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #333;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+        font-family: inherit;
+    }
+
+    .form-control:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    }
+
+    textarea.form-control {
+        resize: vertical;
+    }
+
+    .btn {
+        padding: 10px 30px;
+        border: none;
+        border-radius: 4px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #0056b3;
+    }
+
+    .btn-primary:disabled {
+        background-color: #6c757d;
+        cursor: not-allowed;
+    }
+
+    .loading-indicator {
+        text-align: center;
+        padding: 20px;
+        color: #666;
+    }
+
+    .spinner {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #007bff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-right: 10px;
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .result-section {
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+    }
+
+    .result-section h3 {
+        margin-top: 0;
+        color: #333;
+        border-bottom: 2px solid #007bff;
+        padding-bottom: 10px;
+    }
+
+    .result-content {
+        margin-top: 15px;
+        line-height: 1.6;
+    }
+
+    .result-item {
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .result-item strong {
+        color: #007bff;
+    }
+
+    .error-message {
+        color: #dc3545;
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        padding: 10px;
+        border-radius: 4px;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const promptInput = document.getElementById('promptInput');
+        const aiModeSelect = document.getElementById('aiModeSelect');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const resultSection = document.getElementById('resultSection');
+        const resultContent = document.getElementById('resultContent');
+
+        submitBtn.addEventListener('click', async function() {
+            const prompt = promptInput.value.trim();
+            
+            if (!prompt) {
+                alert('프롬프트를 입력해주세요.');
+                return;
+            }
+
+            const mode = parseInt(aiModeSelect.value);
+
+            // UI 상태 업데이트
+            submitBtn.disabled = true;
+            loadingIndicator.style.display = 'block';
+            resultSection.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/ai/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt: prompt,
+                        mode: mode
+                    })
+                });
+
+                const data = await response.json();
+
+                // 결과 표시
+                displayResult(data);
+
+            } catch (error) {
+                displayError('요청 처리 중 오류가 발생했습니다: ' + error.message);
+            } finally {
+                submitBtn.disabled = false;
+                loadingIndicator.style.display = 'none';
+            }
+        });
+
+        function displayResult(data) {
+            resultSection.style.display = 'block';
+            
+            if (data.success) {
+                resultContent.innerHTML = `
+                    <div class="result-item">
+                        <strong>AI 응답:</strong><br>
+                        ${escapeHtml(data.result)}
+                    </div>
+                    ${data.apiCalled ? `
+                    <div class="result-item">
+                        <strong>호출된 API:</strong> ${escapeHtml(data.apiCalled)}
+                    </div>
+                    ` : ''}
+                `;
+            } else {
+                resultContent.innerHTML = `
+                    <div class="error-message">
+                        <strong>오류:</strong> ${escapeHtml(data.errorMessage || '알 수 없는 오류가 발생했습니다.')}
+                    </div>
+                `;
+            }
+        }
+
+        function displayError(message) {
+            resultSection.style.display = 'block';
+            resultContent.innerHTML = `
+                <div class="error-message">
+                    ${escapeHtml(message)}
+                </div>
+            `;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    });
+</script>

@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent 모드 동작 구조</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .flow-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .step {
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 5px solid #4CAF50;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .step:hover {
+            transform: translateX(10px);
+        }
+        
+        .step-number {
+            background: #4CAF50;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 20px;
+            flex-shrink: 0;
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .step-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .step-description {
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .code-block {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+            overflow-x: auto;
+        }
+        
+        .highlight {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+        }
+        
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .mode-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #dee2e6;
+        }
+        
+        .agent-mode {
+            border-color: #28a745;
+        }
+        
+        .ollama-mode {
+            border-color: #007bff;
+        }
+        
+        .mode-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .agent-title {
+            color: #28a745;
+        }
+        
+        .ollama-title {
+            color: #007bff;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        
+        .check {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .cross {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .arrow {
+            text-align: center;
+            font-size: 2em;
+            color: #4CAF50;
+            margin: 10px 0;
+        }
+        
+        .demo-section {
+            background: #e8f5e8;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        
+        .demo-title {
+            font-size: 1.5em;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .demo-input {
+            background: #fff;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 1.1em;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .demo-output {
+            background: #2d3748;
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-line;
+        }
+        
+        @media (max-width: 768px) {
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+            
+            .step {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .step-number {
+                margin-right: 0;
+                margin-bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Agent 모드 동작 구조</h1>
+            <p>AI API Orchestrator의 Agent 모드가 어떻게 작동하는지 알아보세요!</p>
+        </div>
+        
+        <div class="content">
+            <div class="highlight">
+                <strong>🎯 핵심 포인트:</strong> Agent 모드는 <strong>AI 모델을 사용하지 않고</strong> 순수 C# 코드로 구조화된 응답을 생성합니다!
+            </div>
+            
+            <h2>📋 Agent 모드 처리 과정</h2>
+            
+            <div class="flow-container">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div class="step-title">사용자 입력 받기</div>
+                        <div class="step-description">
+                            사용자가 "서울 날씨 알려줘"라고 입력
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="arrow">⬇️</div>
+                
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div class="step-title">AgentAiService 호출</div>
+                        <div class="step-description">
+                            Agent 모드가 선택되어 AgentAiService.ProcessPromptAsync() 실행
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="arrow">⬇️</div>
+                
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div class="step-title">키워드 분석 (ApiOrchestrator)</div>
+                        <div class="step-description">
+                            "날씨" 키워드를 감지하여 GetWeather API 선택
+                        </div>
+                        <div class="code-block">키워드 매핑: "날씨" → GetWeather API</div>
+                    </div>
+                </div>
+                
+                <div class="arrow">⬇️</div>
+                
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <div class="step-title">Sample API 호출 (SampleApiClient)</div>
+                        <div class="step-description">
+                            내부 HTTP 호출: GET http://localhost:5152/api/sample/weather?location=서울
+                        </div>
+                        <div class="code-block">HTTP 요청 → SampleApiController → JSON 응답</div>
+                    </div>
+                </div>
+                
+                <div class="arrow">⬇️</div>
+                
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <div class="step-title">JSON 데이터 수신</div>
+                        <div class="step-description">
+                            Sample API에서 날씨 데이터를 JSON 형태로 받음
+                        </div>
+                        <div class="code-block">{"location":"서울","temperature":"15°C","condition":"Sunny","humidity":"60%","windSpeed":"10 km/h"}</div>
+                    </div>
+                </div>
+                
+                <div class="arrow">⬇️</div>
+                
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <div class="step-title">순수 C# 코드로 응답 생성</div>
+                        <div class="step-description">
+                            <strong>AI 모델 없이</strong> 미리 정의된 템플릿으로 응답 생성
+                        </div>
+                        <div class="code-block">GenerateWeatherResponse() 메서드 실행
+JSON 파싱 → 템플릿 적용 → 구조화된 응답</div>
+                    </div>
+                </div>
+                
+                <div class="arrow">⬇️</div>
+                
+                <div class="step">
+                    <div class="step-number">7</div>
+                    <div class="step-content">
+                        <div class="step-title">최종 응답 반환</div>
+                        <div class="step-description">
+                            사용자에게 구조화된 날씨 정보 표시
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="demo-section">
+                <div class="demo-title">🎬 실제 동작 예시</div>
+                <div class="demo-input">
+                    입력: "서울 날씨 알려줘"
+                </div>
+                <div class="demo-output">서울의 현재 날씨를 알려드리겠습니다.
+
+🌡️ 기온: 15°C
+☀️ 날씨: Sunny
+💧 습도: 60%
+💨 바람: 10 km/h
+
+좋은 하루 되세요!</div>
+            </div>
+            
+            <h2>🆚 Agent vs Ollama 모드 비교</h2>
+            
+            <div class="comparison">
+                <div class="mode-card agent-mode">
+                    <div class="mode-title agent-title">🤖 Agent 모드</div>
+                    <ul class="feature-list">
+                        <li><span class="check">✅</span> AI 모델 사용 안함</li>
+                        <li><span class="check">✅</span> 순수 C# 코드</li>
+                        <li><span class="check">✅</span> 빠른 응답 (< 1초)</li>
+                        <li><span class="check">✅</span> 구조화된 템플릿</li>
+                        <li><span class="check">✅</span> 100% 예측 가능</li>
+                        <li><span class="cross">❌</span> 자연스러운 대화 제한</li>
+                        <li><span class="cross">❌</span> 내부 HTTP 호출 있음</li>
+                    </ul>
+                </div>
+                
+                <div class="mode-card ollama-mode">
+                    <div class="mode-title ollama-title">🧠 Ollama 모드</div>
+                    <ul class="feature-list">
+                        <li><span class="check">✅</span> 로컬 LLM 사용</li>
+                        <li><span class="check">✅</span> 자연스러운 대화</li>
+                        <li><span class="check">✅</span> 창의적 응답</li>
+                        <li><span class="cross">❌</span> 느린 응답 (3-6초)</li>
+                        <li><span class="cross">❌</span> AI 모델 의존</li>
+                        <li><span class="cross">❌</span> 예측 불가능</li>
+                        <li><span class="cross">❌</span> Ollama 서버 필요</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="highlight">
+                <strong>🔍 네트워크 의존성:</strong><br>
+                • Agent 모드: 내부 HTTP 호출만 (localhost:5152)<br>
+                • Ollama 모드: 내부 HTTP + Ollama 서버 (localhost:11434)<br>
+                • 둘 다 외부 인터넷은 불필요!
+            </div>
+            
+            <h2>💡 Agent 모드의 핵심 코드</h2>
+            
+            <div class="code-block">// Agent 모드 - 순수 C# 템플릿 생성
+private string GenerateWeatherResponse(string prompt, SampleApiResponse response)
+{
+    // JSON 데이터 파싱 (AI 없음)
+    var location = data.GetProperty("location").GetString();
+    var temperature = data.GetProperty("temperature").GetString();
+    var condition = data.GetProperty("condition").GetString();
+    
+    // 미리 정의된 템플릿으로 응답 생성 (AI 없음)
+    return $"{location}의 현재 날씨를 알려드리겠습니다.\n\n" +
+           $"🌡️ 기온: {temperature}\n" +
+           $"☀️ 날씨: {condition}\n" +
+           $"💧 습도: {humidity}\n" +
+           $"💨 바람: {windSpeed}\n\n" +
+           $"좋은 하루 되세요!";
+}</div>
+            
+            <div class="highlight">
+                <strong>🎯 결론:</strong> Agent 모드는 <strong>"가짜 AI"</strong>입니다! 실제로는 똑똑한 C# 코드가 API 데이터를 파싱해서 구조화된 응답을 만드는 것입니다. 빠르고 정확하지만, 진짜 AI의 창의성은 없습니다.
+            </div>
+        </div>
+    </div>
+</body>
+</html>
